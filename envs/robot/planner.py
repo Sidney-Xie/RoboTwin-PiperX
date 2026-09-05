@@ -8,9 +8,14 @@ import toppra as ta
 from mplib.sapien_utils import SapienPlanner, SapienPlanningWorld
 import transforms3d as t3d
 import envs._GLOBAL_CONFIGS as CONFIGS
+import os
 
+
+_CUROBO_IMPORT_DISABLED = os.environ.get("ROBOTWIN_SKIP_CUROBO_IMPORT", "0") == "1"
 
 try:
+    if _CUROBO_IMPORT_DISABLED:
+        raise ImportError("cuRobo import disabled by ROBOTWIN_SKIP_CUROBO_IMPORT=1")
     # ********************** CuroboPlanner (optional) **********************
     from curobo.types.math import Pose as CuroboPose
     import time
@@ -271,9 +276,20 @@ try:
             return result_p, result_q
     
 except Exception as e:
-    print('[planner.py]: Something wrong happened when importing CuroboPlanner! Please check if Curobo is installed correctly. If the problem still exists, you can install Curobo from https://github.com/NVlabs/curobo manually.')
-    print('Exception traceback:')
-    traceback.print_exc()
+    _CUROBO_IMPORT_ERROR = e
+    if not _CUROBO_IMPORT_DISABLED:
+        print('[planner.py]: Something wrong happened when importing CuroboPlanner! Please check if Curobo is installed correctly. If the problem still exists, you can install Curobo from https://github.com/NVlabs/curobo manually.')
+        print('Exception traceback:')
+        traceback.print_exc()
+
+    class CuroboPlanner:
+        """Placeholder used when the optional cuRobo dependency is unavailable."""
+
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError(
+                "CuroboPlanner is unavailable. Install a compatible cuRobo build or unset "
+                "ROBOTWIN_SKIP_CUROBO_IMPORT."
+            ) from _CUROBO_IMPORT_ERROR
 
 
 # ********************** MplibPlanner **********************

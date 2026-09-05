@@ -87,7 +87,7 @@ class Base_Task(gym.Env):
         self.plan_success = True
         self.step_lim = None
         self.fix_gripper = False
-        self.setup_scene()
+        self.setup_scene(**kwags)
 
         self.left_js = None
         self.right_js = None
@@ -122,10 +122,14 @@ class Base_Task(gym.Env):
         self.load_camera(**kwags)
         self.robot.move_to_homestate()
 
-        render_freq = self.render_freq
-        self.render_freq = 0
-        self.together_open_gripper(save_freq=None)
-        self.render_freq = render_freq
+        if kwags.get("skip_initial_gripper_motion", False):
+            self.robot.set_gripper(1.0, "left", gripper_eps=0)
+            self.robot.set_gripper(1.0, "right", gripper_eps=0)
+        else:
+            render_freq = self.render_freq
+            self.render_freq = 0
+            self.together_open_gripper(save_freq=None)
+            self.render_freq = render_freq
 
         self.robot.set_origin_endpose()
         self.load_actors()
@@ -133,10 +137,13 @@ class Base_Task(gym.Env):
         if self.cluttered_table:
             self.get_cluttered_table()
 
-        is_stable, unstable_list = self.check_stable()
-        if not is_stable:
-            raise UnStableError(
-                f'Objects is unstable in seed({kwags.get("seed", 0)}), unstable objects: {", ".join(unstable_list)}')
+        if not kwags.get("skip_stability_check", False):
+            is_stable, unstable_list = self.check_stable()
+            if not is_stable:
+                raise UnStableError(
+                    f'Objects is unstable in seed({kwags.get("seed", 0)}), '
+                    f'unstable objects: {", ".join(unstable_list)}'
+                )
 
         if self.eval_mode:
             with open(os.path.join(CONFIGS_PATH, "_eval_step_limit.yml"), "r") as f:
@@ -211,10 +218,14 @@ class Base_Task(gym.Env):
         # give renderer to sapien sim
         self.engine.set_renderer(self.renderer)
 
-        sapien.render.set_camera_shader_dir("rt")
-        sapien.render.set_ray_tracing_samples_per_pixel(32)
-        sapien.render.set_ray_tracing_path_depth(8)
-        sapien.render.set_ray_tracing_denoiser("oidn")
+        camera_shader = kwargs.get("camera_shader", "rt")
+        sapien.render.set_camera_shader_dir(camera_shader)
+        if camera_shader == "rt":
+            sapien.render.set_ray_tracing_samples_per_pixel(
+                kwargs.get("ray_tracing_samples_per_pixel", 32)
+            )
+            sapien.render.set_ray_tracing_path_depth(kwargs.get("ray_tracing_path_depth", 8))
+            sapien.render.set_ray_tracing_denoiser(kwargs.get("ray_tracing_denoiser", "oidn"))
 
         # declare sapien scene
         scene_config = sapien.SceneConfig()
@@ -387,7 +398,8 @@ class Base_Task(gym.Env):
         """
         if not hasattr(self, "robot"):
             self.robot = Robot(self.scene, self.need_topp, **kwags)
-            self.robot.set_planner(self.scene)
+            if not kwags.get("skip_planner", False):
+                self.robot.set_planner(self.scene)
             self.robot.init_joints()
         else:
             self.robot.reset(self.scene, self.need_topp, **kwags)

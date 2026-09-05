@@ -29,6 +29,7 @@ class Robot:
 
         self.left_js = None
         self.right_js = None
+        self.communication_flag = False
 
         left_embodiment_args = kwargs["left_embodiment_config"]
         right_embodiment_args = kwargs["right_embodiment_config"]
@@ -123,6 +124,10 @@ class Robot:
 
     def reset(self, scene, need_topp=False, **kwargs):
         self._init_robot_(scene, need_topp, **kwargs)
+
+        if kwargs.get("skip_planner", False):
+            self.init_joints()
+            return
 
         if self.communication_flag:
             if hasattr(self, "left_conn") and self.left_conn:
