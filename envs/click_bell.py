@@ -8,7 +8,54 @@ import math
 class click_bell(Base_Task):
 
     def setup_demo(self, **kwags):
+        self.left_press_config = kwags["left_embodiment_config"]
+        self.right_press_config = kwags["right_embodiment_config"]
         super()._init_task_env_(**kwags)
+
+    def _get_press_config(self, arm_tag):
+        return self.left_press_config if arm_tag == "left" else self.right_press_config
+
+    def _get_button_point(self, arm_tag, ret="list"):
+        config = self._get_press_config(arm_tag)
+        point = self.bell.get_contact_point(0, ret)
+        if config.get("click_bell_target_point_type") != "contact_z_offset":
+            return point
+
+        offsets = config.get("click_bell_button_z_offsets", [])
+        if self.bell_id >= len(offsets):
+            return point
+        z_offset = offsets[self.bell_id]
+        if ret == "matrix":
+            point = np.array(point, copy=True)
+            point[2, 3] += z_offset
+        else:
+            point = list(point)
+            point[2] += z_offset
+        return point
+
+    def _get_button_approach_pose(self, arm_tag, pre_press_distance):
+        button_matrix = self._get_button_point(arm_tag, "matrix")
+        global_button_matrix = button_matrix @ np.array(
+            [
+                [0, 0, 1, 0],
+                [-1, 0, 0, 0],
+                [0, -1, 0, 0],
+                [0, 0, 0, 1],
+            ]
+        )
+        button_rotation = global_button_matrix[:3, :3]
+        approach_position = (
+            global_button_matrix[:3, 3]
+            + button_rotation @ np.array([-0.12 - pre_press_distance, 0, 0]).T
+        )
+        approach_pose = approach_position.tolist() + t3d.quaternions.mat2quat(
+            button_rotation
+        ).tolist()
+        return self.choose_best_pose(
+            approach_pose,
+            self._get_button_point(arm_tag, "list"),
+            arm_tag,
+        )
 
     def load_actors(self):
         rand_pos = rand_pose(
@@ -34,31 +81,36 @@ class click_bell(Base_Task):
         )
 
         self.add_prohibit_area(self.bell, padding=0.07)
-        self.check_arm_function = self.is_left_gripper_close if self.bell.get_pose().p[0] < 0 else self.is_right_gripper_close
+        self.arm_tag = ArmTag("right" if self.bell.get_pose().p[0] > 0 else "left")
+        self.check_arm_function = (
+            self.is_left_gripper_close
+            if self.arm_tag == "left"
+            else self.is_right_gripper_close
+        )
     
     def play_once(self):
         # Choose the arm to use: right arm if the bell is on the right side (positive x), left otherwise
-        arm_tag = ArmTag("right" if self.bell.get_pose().p[0] > 0 else "left")
+        arm_tag = self.arm_tag
+        press_config = self._get_press_config(arm_tag)
     
-        # Move the gripper above the top center of the bell and close the gripper to simulate a click
-        # Note: grasp_actor here is not used to grasp the bell, but to simulate a touch/click action
-        # You must use the same pre_grasp_dis and grasp_dis values as in the click_bell task
-        self.move(self.grasp_actor(
-            self.bell,
-            arm_tag=arm_tag,
-            pre_grasp_dis=0.1,
-            grasp_dis=0.1,
-            contact_point_id=0,  # Targeting the bell's top center
-        ))
+        # Move above the configured button point and close the fingers before
+        # pressing. PiPER-X uses the physical top surface; legacy embodiments
+        # keep using the original contact point and distances.
+        approach_pose = self._get_button_approach_pose(
+            arm_tag,
+            press_config.get("click_bell_pre_press_distance", 0.1),
+        )
+        self.move(self.move_to_pose(arm_tag, approach_pose))
+        self.move(self.close_gripper(arm_tag))
     
-        # Move the gripper downward to touch the top center of the bell
-        self.move(self.move_by_displacement(arm_tag, z=-0.045))
+        press_displacement = press_config.get("click_bell_press_displacement", 0.045)
+        self.move(self.move_by_displacement(arm_tag, z=-press_displacement))
     
         # Check whether the simulated click action was successful
         self.check_success()
     
         # Move the gripper back up to the original position (no need to lift or grasp the bell)
-        self.move(self.move_by_displacement(arm_tag, z=0.045))
+        self.move(self.move_by_displacement(arm_tag, z=press_displacement))
     
         # Check success again if needed (optional, based on your task logic)
         self.check_success()
@@ -73,11 +125,17 @@ class click_bell(Base_Task):
             return True
         if not self.check_arm_function():
             return False
-        bell_pose = self.bell.get_contact_point(0)[:3]
+        arm_tag = self.arm_tag
+        press_config = self._get_press_config(arm_tag)
+        bell_pose = self._get_button_point(arm_tag)[:3]
         positions = self.get_gripper_actor_contact_position("050_bell")
-        eps = [0.025, 0.025]
         for position in positions:
-            if (np.all(np.abs(position[:2] - bell_pose[:2]) < eps) and abs(position[2] - bell_pose[2]) < 0.03):
+            xy_error = np.linalg.norm(position[:2] - bell_pose[:2])
+            z_error = abs(position[2] - bell_pose[2])
+            if (
+                xy_error < press_config.get("click_bell_contact_xy_tolerance", 0.025)
+                and z_error < press_config.get("click_bell_contact_z_tolerance", 0.03)
+            ):
                 self.stage_success_tag = True
                 return True
         return False

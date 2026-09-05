@@ -9,6 +9,10 @@ envs/curobo
 viewer_show.*
 eval_video/
 task_config/
+!task_config/
+task_config/*
+!task_config/piper_x_demo_clean.yml
+!task_config/piper_x_demo_randomized.yml
 **/.DS_Store
 
 # eval result
@@ -18,6 +22,12 @@ eval_result/
 assets/*
 !assets/_download.py
 !assets/files
+!assets/embodiments/
+assets/embodiments/*
+!assets/embodiments/piper_x/
+!assets/embodiments/piper_x/**
+# Generated from curobo_tmp.yml and contains a machine-specific absolute path.
+assets/embodiments/piper_x/curobo.yml
 
 policy/weights/*
 
