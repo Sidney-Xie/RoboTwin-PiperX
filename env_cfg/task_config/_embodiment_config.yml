@@ -1,0 +1,24 @@
+aloha-agilex:
+  file_path: "./assets/embodiments/aloha-agilex/"
+
+piper:
+  file_path: "./assets/embodiments/piper"
+
+piper_x:
+  file_path: "./assets/embodiments/piper_x"
+
+# Independently calibrated PiPER-X wrist-camera variants.
+piper_x_left:
+  file_path: "./assets/embodiments/piper_x_left"
+
+piper_x_right:
+  file_path: "./assets/embodiments/piper_x_right"
+
+franka-panda:
+  file_path: "./assets/embodiments/franka-panda/"
+
+ARX-X5:
+  file_path: "./assets/embodiments/ARX-X5"
+
+ur5-wsg:
+  file_path: "./assets/embodiments/ur5-wsg"

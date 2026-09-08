@@ -10,8 +10,12 @@ from task_info import *
 from test_gen_code import setup_task_config, run
 
 # Global variable definitions
-SCRIPT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "script")
-CONFIGS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "task_config")
+SCRIPT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
+CONFIGS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "env_cfg",
+    "task_config",
+)
 
 
 def run_code(task_info, las_error=None, message=None):
@@ -48,13 +52,13 @@ def run_code(task_info, las_error=None, message=None):
 
     except KeyboardInterrupt:
         print("Testing interrupted by user.")
-        return 0, "Testing interrupted by user", 20
+        return 0, "Testing interrupted by user", 20, []
 
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
         print(f"An error occurred during testing: {e}\n{error_trace}")
-        return 0, f"Error during testing: {e}", 20
+        return 0, f"Error during testing: {e}", 20, []
 
 
 def main(task_info_dic):
@@ -111,4 +115,4 @@ if __name__ == "__main__":
 """
 Usage:
 python code_gen/run_code.py task_name
-""" 
+"""

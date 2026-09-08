@@ -1,6 +1,8 @@
 models/
 data/*
+data_new/*
 !data/process_stuck.py
+!data/decode_image_bit.py
 __pycache__/
 **/checkpoints/
 result/
@@ -9,11 +11,9 @@ envs/curobo
 viewer_show.*
 eval_video/
 task_config/
-!task_config/
-task_config/*
-!task_config/piper_x_demo_clean.yml
-!task_config/piper_x_demo_randomized.yml
 **/.DS_Store
+*.bac
+doc/
 
 # eval result
 eval_result/
@@ -28,6 +28,16 @@ assets/embodiments/*
 !assets/embodiments/piper_x/**
 # Generated from curobo_tmp.yml and contains a machine-specific absolute path.
 assets/embodiments/piper_x/curobo.yml
+!assets/embodiments/piper_x_left/
+assets/embodiments/piper_x_left/*
+!assets/embodiments/piper_x_left/config.yml
+!assets/embodiments/piper_x_left/piper_x.urdf
+!assets/embodiments/piper_x_left/curobo_tmp.yml
+!assets/embodiments/piper_x_right/
+assets/embodiments/piper_x_right/*
+!assets/embodiments/piper_x_right/config.yml
+!assets/embodiments/piper_x_right/piper_x.urdf
+!assets/embodiments/piper_x_right/curobo_tmp.yml
 
 policy/weights/*
 

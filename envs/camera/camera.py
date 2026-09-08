@@ -58,6 +58,16 @@ class Camera:
         self.collect_head_camera = kwags["camera"].get("collect_head_camera", True)
         self.collect_wrist_camera = kwags["camera"].get("collect_wrist_camera", True)
 
+        # A pair of otherwise identical robots may carry independently
+        # calibrated wrist cameras. Keep the calibration with each embodiment
+        # so swapping the left/right model cannot silently swap intrinsics.
+        self.left_wrist_camera_calibration = kwags["left_embodiment_config"].get(
+            "wrist_camera_calibration"
+        )
+        self.right_wrist_camera_calibration = kwags["right_embodiment_config"].get(
+            "wrist_camera_calibration"
+        )
+
         # embodiment = kwags.get('embodiment')
         # embodiment_config_path = os.path.join(CONFIGS_PATH, '_embodiment_config.yml')
         # with open(embodiment_config_path, 'r', encoding='utf-8') as f:
@@ -132,22 +142,41 @@ class Camera:
         # ================================= wrist camera =================================
         if self.collect_wrist_camera:
             wrist_camera_config = camera_args[self.wrist_camera_type]
-            self.left_camera = scene.add_camera(
-                name="left_camera",
-                width=wrist_camera_config["w"],
-                height=wrist_camera_config["h"],
-                fovy=np.deg2rad(wrist_camera_config["fovy"]),
-                near=near,
-                far=far,
-            )
 
-            self.right_camera = scene.add_camera(
-                name="right_camera",
-                width=wrist_camera_config["w"],
-                height=wrist_camera_config["h"],
-                fovy=np.deg2rad(wrist_camera_config["fovy"]),
-                near=near,
-                far=far,
+            def create_wrist_camera(name, calibration):
+                width = int(wrist_camera_config["w"])
+                height = int(wrist_camera_config["h"])
+                camera = scene.add_camera(
+                    name=name,
+                    width=width,
+                    height=height,
+                    fovy=np.deg2rad(wrist_camera_config["fovy"]),
+                    near=near,
+                    far=far,
+                )
+                if calibration is not None:
+                    source_width, source_height = map(int, calibration["image_size"])
+                    matrix = np.asarray(calibration["camera_matrix"], dtype=float)
+                    if source_width <= 0 or source_height <= 0 or matrix.shape != (3, 3):
+                        raise ValueError(f"Invalid wrist camera calibration for {name}")
+                    scale_x = width / source_width
+                    scale_y = height / source_height
+                    camera.set_perspective_parameters(
+                        near,
+                        far,
+                        float(matrix[0, 0] * scale_x),
+                        float(matrix[1, 1] * scale_y),
+                        float(matrix[0, 2] * scale_x),
+                        float(matrix[1, 2] * scale_y),
+                        float(matrix[0, 1] * scale_x),
+                    )
+                return camera
+
+            self.left_camera = create_wrist_camera(
+                "left_camera", self.left_wrist_camera_calibration
+            )
+            self.right_camera = create_wrist_camera(
+                "right_camera", self.right_wrist_camera_calibration
             )
 
         # ================================= sensor camera =================================

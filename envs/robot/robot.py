@@ -21,6 +21,10 @@ class Robot:
     def __init__(self, scene, need_topp=False, **kwargs):
         super().__init__()
         ta.setup_logging("CRITICAL")  # hide logging
+        # set_planner() changes this to True when the two arms use different
+        # cuRobo configuration files and therefore run in worker processes.
+        # Keep that state across per-episode robot resets.
+        self.communication_flag = False
         self._init_robot_(scene, need_topp, **kwargs)
 
     def _init_robot_(self, scene, need_topp=False, **kwargs):
@@ -29,7 +33,6 @@ class Robot:
 
         self.left_js = None
         self.right_js = None
-        self.communication_flag = False
 
         left_embodiment_args = kwargs["left_embodiment_config"]
         right_embodiment_args = kwargs["right_embodiment_config"]
@@ -137,7 +140,9 @@ class Robot:
                 self.right_conn.send({"cmd": "reset"})
                 _ = self.right_conn.recv()
         else:
-            if not isinstance(self.left_planner, CuroboPlanner) or not isinstance(self.right_planner, CuroboPlanner):
+            if not isinstance(getattr(self, "left_planner", None), CuroboPlanner) or not isinstance(
+                getattr(self, "right_planner", None), CuroboPlanner
+            ):
                 self.set_planner(scene=scene)
 
         self.init_joints()

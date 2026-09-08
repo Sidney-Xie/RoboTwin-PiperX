@@ -1,8 +1,5 @@
-from copy import deepcopy
 from ._base_task import Base_Task
 from .utils import *
-import sapien
-import math
 
 
 class click_bell(Base_Task):
@@ -13,28 +10,40 @@ class click_bell(Base_Task):
         super()._init_task_env_(**kwags)
 
     def _get_press_config(self, arm_tag):
-        return self.left_press_config if arm_tag == "left" else self.right_press_config
+        return (
+            self.left_press_config
+            if arm_tag == "left"
+            else self.right_press_config
+        )
 
     def _get_button_point(self, arm_tag, ret="list"):
-        config = self._get_press_config(arm_tag)
+        """Return the physical button apex for calibrated embodiments.
+
+        The configured per-model values are z corrections from RoboTwin's
+        legacy contact point to the collision-mesh apex, not absolute heights.
+        """
         point = self.bell.get_contact_point(0, ret)
+        config = self._get_press_config(arm_tag)
         if config.get("click_bell_target_point_type") != "contact_z_offset":
             return point
 
         offsets = config.get("click_bell_button_z_offsets", [])
-        if self.bell_id >= len(offsets):
+        if point is None or self.bell_id >= len(offsets):
             return point
-        z_offset = offsets[self.bell_id]
+
+        point = np.array(point, copy=True) if ret == "matrix" else list(point)
         if ret == "matrix":
-            point = np.array(point, copy=True)
-            point[2, 3] += z_offset
+            point[2, 3] += float(offsets[self.bell_id])
         else:
-            point = list(point)
-            point[2] += z_offset
+            point[2] += float(offsets[self.bell_id])
         return point
 
     def _get_button_approach_pose(self, arm_tag, pre_press_distance):
         button_matrix = self._get_button_point(arm_tag, "matrix")
+        button_point = self._get_button_point(arm_tag, "list")
+        if button_matrix is None or button_point is None:
+            return None
+
         global_button_matrix = button_matrix @ np.array(
             [
                 [0, 0, 1, 0],
@@ -51,11 +60,7 @@ class click_bell(Base_Task):
         approach_pose = approach_position.tolist() + t3d.quaternions.mat2quat(
             button_rotation
         ).tolist()
-        return self.choose_best_pose(
-            approach_pose,
-            self._get_button_point(arm_tag, "list"),
-            arm_tag,
-        )
+        return self.choose_best_pose(approach_pose, button_point, arm_tag)
 
     def load_actors(self):
         rand_pos = rand_pose(
@@ -81,44 +86,46 @@ class click_bell(Base_Task):
         )
 
         self.add_prohibit_area(self.bell, padding=0.07)
-        self.arm_tag = ArmTag("right" if self.bell.get_pose().p[0] > 0 else "left")
+        self.arm_tag = ArmTag(
+            "right" if self.bell.get_pose().p[0] > 0 else "left"
+        )
         self.check_arm_function = (
             self.is_left_gripper_close
             if self.arm_tag == "left"
             else self.is_right_gripper_close
         )
-    
+
     def play_once(self):
-        # Choose the arm to use: right arm if the bell is on the right side (positive x), left otherwise
         arm_tag = self.arm_tag
         press_config = self._get_press_config(arm_tag)
-    
-        # Move above the configured button point and close the fingers before
-        # pressing. PiPER-X uses the physical top surface; legacy embodiments
-        # keep using the original contact point and distances.
-        approach_pose = self._get_button_approach_pose(
-            arm_tag,
-            press_config.get("click_bell_pre_press_distance", 0.1),
-        )
-        self.move(self.move_to_pose(arm_tag, approach_pose))
-        self.move(self.close_gripper(arm_tag))
-    
-        press_displacement = press_config.get("click_bell_press_displacement", 0.045)
-        self.move(self.move_by_displacement(arm_tag, z=-press_displacement))
-    
-        # Check whether the simulated click action was successful
-        self.check_success()
-    
-        # Move the gripper back up to the original position (no need to lift or grasp the bell)
-        self.move(self.move_by_displacement(arm_tag, z=press_displacement))
-    
-        # Check success again if needed (optional, based on your task logic)
-        self.check_success()
-    
-        # Record which bell and arm were used in the info dictionary
-        self.info["info"] = {"{A}": f"050_bell/base{self.bell_id}", "{a}": str(arm_tag)}
-        return self.info
 
+        # The old grasp_actor path stayed 0.10 m above the legacy point and
+        # moved only 0.045 m down, so PiPER-X never reached the button.
+        pre_press_distance = float(
+            press_config.get("click_bell_pre_press_distance", 0.1)
+        )
+        approach_pose = self._get_button_approach_pose(arm_tag, pre_press_distance)
+        if approach_pose is None:
+            self.plan_success = False
+        else:
+            self.move(self.move_to_pose(arm_tag, approach_pose))
+            self.move(self.close_gripper(arm_tag))
+
+            press_displacement = float(
+                press_config.get("click_bell_press_displacement", 0.045)
+            )
+            self.move(self.move_by_displacement(arm_tag, z=-press_displacement))
+
+            # Contact must be inspected while the gripper is still pressing.
+            self.check_success()
+            self.move(self.move_by_displacement(arm_tag, z=press_displacement))
+
+        # Record which bell and arm were used in the info dictionary
+        self.info["info"] = {
+            "{A}": f"050_bell/base{self.bell_id}",
+            "{a}": str(arm_tag),
+        }
+        return self.info
 
     def check_success(self):
         if self.stage_success_tag:
@@ -133,8 +140,10 @@ class click_bell(Base_Task):
             xy_error = np.linalg.norm(position[:2] - bell_pose[:2])
             z_error = abs(position[2] - bell_pose[2])
             if (
-                xy_error < press_config.get("click_bell_contact_xy_tolerance", 0.025)
-                and z_error < press_config.get("click_bell_contact_z_tolerance", 0.03)
+                xy_error
+                < float(press_config.get("click_bell_contact_xy_tolerance", 0.025))
+                and z_error
+                < float(press_config.get("click_bell_contact_z_tolerance", 0.03))
             ):
                 self.stage_success_tag = True
                 return True

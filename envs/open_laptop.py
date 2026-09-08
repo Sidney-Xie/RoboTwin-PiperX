@@ -30,6 +30,10 @@ class open_laptop(Base_Task):
         self.add_prohibit_area(self.laptop, padding=0.1)
         face_prod = get_face_prod(self.laptop.get_pose().q, [1, 0, 0], [1, 0, 0])
         self.arm_tag = ArmTag("left" if face_prod > 0 else "right")
+<<<<<<< HEAD
+=======
+
+>>>>>>> 96c1feab536306b50c26af200044fcdf126e8904
 
     def play_once(self):
         face_prod = get_face_prod(self.laptop.get_pose().q, [1, 0, 0], [1, 0, 0])

@@ -6,37 +6,33 @@
 ## 组成
 
 - `assets/embodiments/piper_x/piper_x.urdf`：官方 PiPER-X 本体和夹爪模型的
-  SAPIEN/cuRobo 扁平化版本，并带腕部相机坐标系。
+  SAPIEN/cuRobo 扁平化版本，并带默认腕部相机坐标系。
+- `assets/embodiments/piper_x_left`、`piper_x_right`：使用 2026-09-08
+  工作台标定结果的左右腕相机独立模型。
 - `assets/embodiments/piper_x/config.yml`：RoboTwin 关节、夹爪、TCP、相机和
   双臂基座配置。
 - `assets/embodiments/piper_x/piper_x.srdf`：相邻链接和固定腕部结构的碰撞白名单。
 - `assets/embodiments/piper_x/curobo_tmp.yml`：可迁移的 cuRobo 配置模板。
 - `assets/embodiments/piper_x/collision_piper_x.yml`：32 球碰撞近似。
-- `task_config/piper_x_debug.yml`：1 集、双臂、三相机的采集验证配置。
-- `task_config/piper_x_demo_clean.yml`：50 集干净背景采集配置。
+- `env_cfg/task_config/piper_x_demo_clean.yml`：干净背景采集配置。
+- `env_cfg/task_config/piper_x_demo_randomized.yml`：随机背景采集配置。
 
 模型来源和上游版本记录在 `assets/embodiments/piper_x/SOURCE.md`，许可证见同目录
 `LICENSE.agx_arm_urdf`。
 
 ## 采集
 
-单集验证：
+干净背景数据：
 
 ```bash
 conda activate RoboTwin
-python script/collect_data.py handover_block piper_x_debug
-```
-
-50 集干净背景数据：
-
-```bash
-python script/collect_data.py handover_block piper_x_demo_clean
+python scripts/collect_data.py handover_block piper_x_demo_clean
 ```
 
 双臂由任务配置中的下列三元组启用；第三项是两个基座中心的间距（米）：
 
 ```yaml
-embodiment: [piper_x, piper_x, 0.65]
+embodiment: [piper_x_left, piper_x_right, 0.60]
 ```
 
 默认使用 SAPIEN `default` raster shader，以避免长时间采集时 OIDN 光追去噪器的
@@ -48,24 +44,25 @@ GPU 稳定性问题。需要光追时可将任务配置中的 `camera_shader` �
 
 ## 腕部相机外参
 
-`piper_x.urdf` 中的 `camera_joint` 以 `link6` 为父坐标系，使用 SAPIEN 相机约定：
-相机局部 `+X` 为光轴向前、`+Y` 向左、`+Z` 向上。左右臂加载同一个 URDF，因而
-使用相同的局部外参：
+各 `piper_x.urdf` 中的 `camera_joint` 以 `link6` 为父坐标系，使用 SAPIEN 相机
+约定：相机局部 `+X` 为光轴向前、`+Y` 向左、`+Z` 向上。使用下面的 embodiment
+三元组时，左右臂分别加载独立标定的 URDF 和内参：
 
-```xml
-<origin xyz="-0.0347 -0.0687 0.0430"
-        rpy="0 -1.1116927 1.5707963"/>
+```yaml
+embodiment: [piper_x_left, piper_x_right, 0.60]
 ```
 
-这组参数由 `末端相机固定结构件.STEP` 推导。STEP 使用毫米单位，支架包围盒约为
-`81.0 x 73.7 x 48.0 mm`，腕部夹持内圆直径约 `57.2 mm`，相机安装板倾角为
-`20 deg`，四个安装孔形成约 `45 x 5 mm` 的孔距。支架相对 PiPER-X 夹爪绕
-`link6` 旋转 `90 deg` 后，安装孔中心和现有 PiPER D435 光心偏置共同给出上述
-平移；姿态保留现有 D435 光学坐标系相对安装板的约 `6.3 deg` 修正。
+标定文件导出的 `T_ee_camera` 使用 OpenCV 光学轴，写入 URDF 前已转换为 SAPIEN
+相机轴。左右 `config.yml` 同时保留各自的 640×480 相机矩阵；采集分辨率不同时，
+`Camera` 会等比例缩放 `fx/fy/cx/cy`。SAPIEN 输出为无畸变针孔图像，因此标定的
+Brown 畸变系数仅作溯源，未用于渲染。
 
-STEP 只包含固定结构件，不包含相机本体。因此这组外参中的支架尺寸和安装板倾角
-来自 CAD，而光心到安装孔的偏置来自仓库现有 D435 模型。若实机使用不同相机、
-垫片或孔位，应以实测 `link6 -> optical_center` 手眼标定结果替换该值。
+该次标定的左右重投影中位数分别为 `0.266 px` 和 `0.317 px`，但总体几何质量门控
+为 `failed`，原因是左右求解器的基座平移结果分歧超过阈值。当前配置按导出的
+手眼结果落地，正式大批量采集前应先用若干真实/仿真对应姿态复核目标投影位置。
+
+公共 `piper_x` 模型仍保留由固定结构件 CAD 推导的默认外参；实际双臂数据采集应
+使用上述左右独立 embodiment，避免装配误差被一个公共外参覆盖。
 
 ## 路径迁移
 
@@ -73,7 +70,7 @@ STEP 只包含固定结构件，不包含相机本体。因此这组外参中的
 移动仓库后，在仓库根目录运行：
 
 ```bash
-python script/update_embodiment_config_path.py
+python scripts/update_embodiment_config_path.py
 ```
 
 这会重新生成所有 embodiment 的绝对路径 cuRobo 配置。
