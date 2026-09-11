@@ -20,6 +20,29 @@
 模型来源和上游版本记录在 `assets/embodiments/piper_x/SOURCE.md`，许可证见同目录
 `LICENSE.agx_arm_urdf`。
 
+## 灯光基线
+
+两个 Piper-X 任务配置使用同一套已验证的工作台灯光参数，避免一体化仓库与外部
+环境适配出现不同的成像条件：
+
+```yaml
+ambient_light: [0.60, 0.60, 0.60]
+direction_lights: []
+point_lights: []
+area_lights:
+  - position: [0.0, 0.0, 2.60]
+    quaternion: [0.0, 1.0, 0.0, 0.0]  # wxyz; local +Z points down
+    half_width: 1.80
+    half_height: 0.80
+    color: [4.5, 4.5, 4.5]
+```
+
+这是一个位于工作台正上方的单个矩形区域光；`envs/_base_task.py` 会通过
+`add_area_light_for_ray_tracing` 创建它。`direction_lights` 和 `point_lights` 显式为空，
+因此不会叠加 RoboTwin 默认的方向光或左右点光源。该区域光配置仅在 `rt` shader 下
+产生面积光效果；干净配置与随机背景配置的光源参数保持一致，随机背景不会改变灯具
+位置、朝向、面积或颜色。
+
 ## 采集
 
 干净背景数据：
