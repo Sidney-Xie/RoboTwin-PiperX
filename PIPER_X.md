@@ -32,7 +32,7 @@ python scripts/collect_data.py handover_block piper_x_demo_clean
 双臂由任务配置中的下列三元组启用；第三项是两个基座中心的间距（米）：
 
 ```yaml
-embodiment: [piper_x_left, piper_x_right, 0.60]
+embodiment: [piper_x_left, piper_x_right, 0.5870514170838435]
 ```
 
 默认使用 SAPIEN `default` raster shader，以避免长时间采集时 OIDN 光追去噪器的
@@ -49,7 +49,7 @@ GPU 稳定性问题。需要光追时可将任务配置中的 `camera_shader` �
 三元组时，左右臂分别加载独立标定的 URDF 和内参：
 
 ```yaml
-embodiment: [piper_x_left, piper_x_right, 0.60]
+embodiment: [piper_x_left, piper_x_right, 0.5870514170838435]
 ```
 
 标定文件导出的 `T_ee_camera` 使用 OpenCV 光学轴，写入 URDF 前已转换为 SAPIEN

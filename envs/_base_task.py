@@ -241,11 +241,11 @@ class Base_Task(gym.Env):
             kwargs.get("restitution", 0),
         )
         # give some white ambient light of moderate intensity
-        self.scene.set_ambient_light(kwargs.get("ambient_light", [0.5, 0.5, 0.5]))
+        self.scene.set_ambient_light(kwargs.get("ambient_light", [0.62, 0.62, 0.62]))
         # default enable shadow unless specified otherwise
         shadow = kwargs.get("shadow", True)
         # default spotlight angle and intensity
-        direction_lights = kwargs.get("direction_lights", [[[0, 0.5, -1], [0.5, 0.5, 0.5]]])
+        direction_lights = kwargs.get("direction_lights", [])
         self.direction_light_lst = []
         for direction_light in direction_lights:
             if self.random_light:
@@ -257,7 +257,7 @@ class Base_Task(gym.Env):
             self.direction_light_lst.append(
                 self.scene.add_directional_light(direction_light[0], direction_light[1], shadow=shadow))
         # default point lights position and intensity
-        point_lights = kwargs.get("point_lights", [[[1, 0, 1.8], [1, 1, 1]], [[-1, 0, 1.8], [1, 1, 1]]])
+        point_lights = kwargs.get("point_lights", [])
         self.point_light_lst = []
         for point_light in point_lights:
             if self.random_light:

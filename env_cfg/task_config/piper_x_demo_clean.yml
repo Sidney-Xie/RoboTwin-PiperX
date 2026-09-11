@@ -4,7 +4,7 @@ camera_shader: default
 episode_num: 50
 use_seed: false
 save_freq: 10
-embodiment: [piper_x_left, piper_x_right, 0.59]
+embodiment: [piper_x_left, piper_x_right, 0.5870514170838435]
 language_num: 100
 domain_randomization:
   random_background: false
