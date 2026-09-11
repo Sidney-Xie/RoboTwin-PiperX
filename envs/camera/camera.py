@@ -88,7 +88,7 @@ class Camera:
         Add cameras and set camera parameters
             - Including four cameras: left, right, front, head.
         """
-        near, far = 0.1, 100
+        near, far = 0.01, 100
         camera_config_path = os.path.join(CONFIGS_PATH, "_camera_config.yml")
 
         assert os.path.isfile(camera_config_path), "task config file is missing"

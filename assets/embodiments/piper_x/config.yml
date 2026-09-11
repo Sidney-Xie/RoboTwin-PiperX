@@ -1,3 +1,77 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:76e687e9e1ec6a904ec1216eb4206a382ceaa23545f6e60cf5dce47002e34747
-size 2962
+urdf_path: "./piper_x.urdf"
+srdf_path: "./piper_x.srdf"
+joint_stiffness: 1000
+joint_damping: 200
+gripper_stiffness: 1000
+gripper_damping: 200
+move_group: ["link6", "link6"]
+ee_joints: ["joint6", "joint6"]
+arm_joints_name:
+  - ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+  - ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+gripper_name:
+  - base: "gripper"
+    mimic:
+      - ["gripper_joint1", 0.5, 0.0]
+      - ["gripper_joint2", -0.5, 0.0]
+  - base: "gripper"
+    mimic:
+      - ["gripper_joint1", 0.5, 0.0]
+      - ["gripper_joint2", -0.5, 0.0]
+gripper_bias: 0.138
+gripper_scale: [0.0, 0.1]
+
+# click_bell's asset contact point is below the real top of the push button.
+# Values are per-model z corrections measured from the collision meshes.
+click_bell_target_point_type: "contact_z_offset"
+click_bell_button_z_offsets: [0.02865881621837616, 0.026478214263916017]
+click_bell_pre_press_distance: 0.03
+# Move 3 mm past the nominal apex so the physics engine produces contact.
+click_bell_press_displacement: 0.02
+click_bell_contact_xy_tolerance: 0.012
+click_bell_contact_z_tolerance: 0.004
+
+# Task-specific reachability/action calibration for the six low-success tasks.
+# Clean collection uses the narrower rotation ranges; randomized collection
+# keeps broader object-pose variation after the clean policy has passed.
+click_alarmclock_clean_rotation_limit: [0.0, 0.25, 0.0]
+click_alarmclock_randomized_rotation_limit: [0.0, 0.6, 0.0]
+click_alarmclock_pre_press_distance: 0.04
+click_alarmclock_press_displacement: 0.05
+click_alarmclock_contact_xy_tolerance: 0.035
+click_alarmclock_contact_z_tolerance: 0.025
+
+turn_switch_clean_rotation_limit: [0.0, 0.0, 0.35]
+turn_switch_randomized_rotation_limit: [0.0, 0.0, 0.785398]
+turn_switch_pre_grasp_distance: 0.04
+turn_switch_probe_distance: 0.008
+turn_switch_max_sweep_steps: 24
+turn_switch_success_fraction: 0.5
+
+open_microwave_x_range: [-0.18, -0.08]
+open_microwave_y_range: [-0.02, 0.04]
+open_microwave_pre_grasp_distance: 0.06
+open_microwave_pull_step: 0.015
+open_microwave_max_pull_steps: 20
+open_microwave_model_ids: [0]
+
+homestate:
+  # joint2/joint3 use zero as a hard limit; stay 0.05 rad inside to avoid
+  # floating-point drift being rejected by cuRobo's start-state validator.
+  - [0, 0.05, -0.05, 0, 0, 0]
+  - [0, 0.05, -0.05, 0, 0, 0]
+# PiPER-X rotates the gripper by +90 degrees around link6 compared with PiPER.
+delta_matrix: [[0, -1, 0], [0, 0, -1], [1, 0, 0]]
+# SAPIEN exposes joint6's joint frame; this maps it back to the link6 frame
+# used by cuRobo, making planned and observed end-effector poses round-trip.
+global_trans_matrix: [[0, 0, 1], [0, 1, 0], [-1, 0, 0]]
+robot_pose: [[0, -0.35, 0.76, 0.7071068, 0, 0, 0.7071068]]
+planner: "curobo"
+dual_arm: false
+rotate_lim: [0.2, 1]
+grasp_perfect_direction: ["front_right", "front_left"]
+static_camera_list:
+  - name: head_camera
+    position: [-0.032, -0.36, 1.26]
+    forward: [0, 0.5000, -0.8660]
+    left: [-1, 0, 0]
