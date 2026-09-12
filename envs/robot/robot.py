@@ -521,7 +521,7 @@ class Robot:
         left_active_joints = self.left_entity.get_active_joints()
         for joint in self.left_arm_joints:
             jointState_list.append(left_joints_qpos[left_active_joints.index(joint)])
-        jointState_list.append(self.get_left_gripper_val())
+        jointState_list.append(self.get_left_gripper_actual_val())
         return jointState_list
 
     def get_right_arm_real_jointState(self) -> list:
@@ -530,8 +530,69 @@ class Robot:
         right_active_joints = self.right_entity.get_active_joints()
         for joint in self.right_arm_joints:
             jointState_list.append(right_joints_qpos[right_active_joints.index(joint)])
-        jointState_list.append(self.get_right_gripper_val())
+        jointState_list.append(self.get_right_gripper_actual_val())
         return jointState_list
+
+    @staticmethod
+    def _get_gripper_actual_val(entity, active_joints, gripper_joints, gripper_scale):
+        """Return the physical finger aperture normalized to the command range."""
+        if not gripper_joints or gripper_joints[0][0] is None:
+            print("No gripper")
+            return 0.0
+
+        # Some embodiments (notably PiPER-X) have a collision-free virtual
+        # master joint plus independently driven physical finger joints.  The
+        # virtual joint reaches its target even when an object blocks the
+        # fingers, so only joints whose child links have collision shapes are
+        # used when that information is available.
+        physical_joints = []
+        for joint_info in gripper_joints:
+            joint = joint_info[0]
+            child_link = getattr(joint, "child_link", None)
+            get_collision_shapes = getattr(child_link, "get_collision_shapes", None)
+            if get_collision_shapes is None or get_collision_shapes():
+                physical_joints.append(joint_info)
+        measured_joints = physical_joints or gripper_joints
+
+        qpos = entity.get_qpos()
+        equivalent_master_positions = []
+        for joint, multiplier, offset in measured_joints:
+            if joint is None or multiplier == 0:
+                continue
+            try:
+                joint_index = active_joints.index(joint)
+            except ValueError as exc:
+                raise ValueError("Gripper joint is not an active articulation joint") from exc
+            actual_position = float(qpos[joint_index])
+            equivalent_master_positions.append((actual_position - offset) / multiplier)
+
+        if not equivalent_master_positions:
+            raise ValueError("No measurable gripper joints were configured")
+
+        closed_position, open_position = gripper_scale
+        position_range = open_position - closed_position
+        if position_range == 0:
+            raise ValueError("gripper_scale must have different closed and open positions")
+
+        actual_position = float(np.mean(equivalent_master_positions))
+        normalized_position = (actual_position - closed_position) / position_range
+        return float(np.clip(normalized_position, 0.0, 1.0))
+
+    def get_left_gripper_actual_val(self):
+        return self._get_gripper_actual_val(
+            self.left_entity,
+            self.left_active_joints,
+            self.left_gripper,
+            self.left_gripper_scale,
+        )
+
+    def get_right_gripper_actual_val(self):
+        return self._get_gripper_actual_val(
+            self.right_entity,
+            self.right_active_joints,
+            self.right_gripper,
+            self.right_gripper_scale,
+        )
 
     def get_left_gripper_val(self):
         if None in self.left_gripper:

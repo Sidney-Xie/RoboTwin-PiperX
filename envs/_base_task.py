@@ -452,6 +452,7 @@ class Base_Task(gym.Env):
         pkl_dic = {
             "observation": {},
             "pointcloud": [],
+            "joint_state": {},
             "joint_action": {},
             "endpose": {},
         }
@@ -484,8 +485,8 @@ class Base_Task(gym.Env):
         # endpose
         if self.data_type.get("endpose", False):
             norm_gripper_val = [
-                self.robot.get_left_gripper_val(),
-                self.robot.get_right_gripper_val(),
+                self.robot.get_left_gripper_actual_val(),
+                self.robot.get_right_gripper_actual_val(),
             ]
             left_endpose = self.get_arm_pose("left")
             right_endpose = self.get_arm_pose("right")
@@ -504,6 +505,8 @@ class Base_Task(gym.Env):
             pkl_dic["joint_action"]["right_arm"] = right_jointstate[:-1]
             pkl_dic["joint_action"]["right_gripper"] = right_jointstate[-1]
             pkl_dic["joint_action"]["vector"] = np.array(left_jointstate + right_jointstate)
+            pkl_dic["joint_state"]["left_gripper"] = self.robot.get_left_gripper_actual_val()
+            pkl_dic["joint_state"]["right_gripper"] = self.robot.get_right_gripper_actual_val()
         # pointcloud
         if self.data_type.get("pointcloud", False):
             pkl_dic["pointcloud"] = self.cameras.get_pcd(self.data_type.get("conbine", False))

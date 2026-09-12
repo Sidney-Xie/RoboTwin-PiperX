@@ -58,14 +58,21 @@ class Camera:
         self.collect_head_camera = kwags["camera"].get("collect_head_camera", True)
         self.collect_wrist_camera = kwags["camera"].get("collect_wrist_camera", True)
 
+        self.head_camera_calibration = kwags["camera"].get(
+            "head_camera_intrinsics",
+            kwags["left_embodiment_config"].get("head_camera_calibration"),
+        )
+
         # A pair of otherwise identical robots may carry independently
         # calibrated wrist cameras. Keep the calibration with each embodiment
         # so swapping the left/right model cannot silently swap intrinsics.
-        self.left_wrist_camera_calibration = kwags["left_embodiment_config"].get(
-            "wrist_camera_calibration"
+        self.left_wrist_camera_calibration = kwags["camera"].get(
+            "left_wrist_camera_intrinsics",
+            kwags["left_embodiment_config"].get("wrist_camera_calibration"),
         )
-        self.right_wrist_camera_calibration = kwags["right_embodiment_config"].get(
-            "wrist_camera_calibration"
+        self.right_wrist_camera_calibration = kwags["camera"].get(
+            "right_wrist_camera_intrinsics",
+            kwags["right_embodiment_config"].get("wrist_camera_calibration"),
         )
 
         # embodiment = kwags.get('embodiment')
@@ -96,10 +103,31 @@ class Camera:
         with open(camera_config_path, "r", encoding="utf-8") as f:
             camera_args = yaml.load(f.read(), Loader=yaml.FullLoader)
 
+        def apply_calibrated_intrinsics(camera, camera_config, calibration, name):
+            if calibration is None:
+                return
+            width = int(camera_config["w"])
+            height = int(camera_config["h"])
+            source_width, source_height = map(float, calibration["image_size"])
+            matrix = np.asarray(calibration["camera_matrix"], dtype=float)
+            if source_width <= 0 or source_height <= 0 or matrix.shape != (3, 3):
+                raise ValueError(f"Invalid camera calibration for {name}")
+            scale_x = width / source_width
+            scale_y = height / source_height
+            camera.set_perspective_parameters(
+                near,
+                far,
+                float(matrix[0, 0] * scale_x),
+                float(matrix[1, 1] * scale_y),
+                float(matrix[0, 2] * scale_x),
+                float(matrix[1, 2] * scale_y),
+                float(matrix[0, 1] * scale_x),
+            )
+
         # sensor_mount_actor = scene.create_actor_builder().build_kinematic()
 
         # camera_args = get_camera_config()
-        def create_camera(camera_info, random_head_camera_dis=0):
+        def create_camera(camera_info, random_head_camera_dis=0, calibration=None):
             if camera_info["type"] not in camera_args.keys():
                 raise ValueError(f"Camera type {camera_info['type']} not supported")
 
@@ -128,6 +156,9 @@ class Camera:
                 far=far,
             )
             camera.entity.set_pose(sapien.Pose(mat44))
+            apply_calibrated_intrinsics(
+                camera, camera_config, calibration, camera_info["name"]
+            )
 
             # ========================= sensor camera =========================
             # sensor_camera = StereoDepthSensor(
@@ -154,22 +185,7 @@ class Camera:
                     near=near,
                     far=far,
                 )
-                if calibration is not None:
-                    source_width, source_height = map(int, calibration["image_size"])
-                    matrix = np.asarray(calibration["camera_matrix"], dtype=float)
-                    if source_width <= 0 or source_height <= 0 or matrix.shape != (3, 3):
-                        raise ValueError(f"Invalid wrist camera calibration for {name}")
-                    scale_x = width / source_width
-                    scale_y = height / source_height
-                    camera.set_perspective_parameters(
-                        near,
-                        far,
-                        float(matrix[0, 0] * scale_x),
-                        float(matrix[1, 1] * scale_y),
-                        float(matrix[0, 2] * scale_x),
-                        float(matrix[1, 2] * scale_y),
-                        float(matrix[0, 1] * scale_x),
-                    )
+                apply_calibrated_intrinsics(camera, wrist_camera_config, calibration, name)
                 return camera
 
             self.left_camera = create_wrist_camera(
@@ -214,8 +230,11 @@ class Camera:
                     self.head_camera_id = i
                     camera_info["type"] = self.head_camera_type
                     # camera, sensor_camera, camera_config = create_camera(camera_info)
-                    camera, camera_config = create_camera(camera_info,
-                                                          random_head_camera_dis=self.random_head_camera_dis)
+                    camera, camera_config = create_camera(
+                        camera_info,
+                        random_head_camera_dis=self.random_head_camera_dis,
+                        calibration=self.head_camera_calibration,
+                    )
                     self.static_camera_list.append(camera)
                     self.static_camera_name.append(camera_info["name"])
                     # self.static_sensor_camera_list.append(sensor_camera)
