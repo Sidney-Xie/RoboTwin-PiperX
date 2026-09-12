@@ -240,7 +240,9 @@ class Base_Task(gym.Env):
             kwargs.get("dynamic_friction", 0.5),
             kwargs.get("restitution", 0),
         )
-        # give some white ambient light of moderate intensity
+        # Lighting is fully config-driven. Piper-X uses one calibrated ceiling
+        # area light; keep directional/point lights empty unless a task config
+        # explicitly requests them.
         self.scene.set_ambient_light(kwargs.get("ambient_light", [0.62, 0.62, 0.62]))
         # default enable shadow unless specified otherwise
         shadow = kwargs.get("shadow", True)
@@ -263,6 +265,24 @@ class Base_Task(gym.Env):
             if self.random_light:
                 point_light[1] = [np.random.rand(), np.random.rand(), np.random.rand()]
             self.point_light_lst.append(self.scene.add_point_light(point_light[0], point_light[1], shadow=shadow))
+
+        # SAPIEN area lights are ray-tracing lights. The pose quaternion is in
+        # wxyz order; the Piper-X calibrated fixture uses a 180-degree X
+        # rotation so its local +Z normal faces down toward the work surface.
+        self.area_light_lst = []
+        for area_light in kwargs.get("area_lights", []):
+            pose = sapien.Pose(
+                p=area_light["position"],
+                q=area_light.get("quaternion", [0.0, 1.0, 0.0, 0.0]),
+            )
+            self.area_light_lst.append(
+                self.scene.add_area_light_for_ray_tracing(
+                    pose,
+                    area_light["color"],
+                    float(area_light["half_width"]),
+                    float(area_light["half_height"]),
+                )
+            )
 
         # initialize viewer with camera position and orientation
         if self.render_freq:

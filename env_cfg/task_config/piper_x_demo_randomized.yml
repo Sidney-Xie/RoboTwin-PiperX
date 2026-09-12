@@ -14,6 +14,15 @@ domain_randomization:
   random_table_height: 0.03
   random_light: true
   crazy_random_light_rate: 0.02
+ambient_light: [0.60, 0.60, 0.60]
+direction_lights: []
+point_lights: []
+area_lights:
+  - position: [0.0, 0.0, 2.60]
+    quaternion: [0.0, 1.0, 0.0, 0.0]
+    half_width: 1.80
+    half_height: 0.80
+    color: [4.5, 4.5, 4.5]
 camera:
   head_camera_type: D435
   wrist_camera_type: D435
